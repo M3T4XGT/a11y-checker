@@ -11,21 +11,35 @@
 
   <header class="site-header">
     <h1>Accessibility Checker</h1>
-    <p>Paste HTML and check it against common WCAG 2.1 AA problems.</p>
+    <p>Check a web page or pasted HTML against common WCAG 2.1 AA problems.</p>
   </header>
 
   <main id="main">
-    <form id="check-form">
+    <form id="url-form" class="panel">
+      <label for="url-input">Web page address</label>
+      <p id="url-help" class="help">For example https://www.juniata.edu. URL checking needs PHP (see the README).</p>
+      <div class="url-row">
+        <input id="url-input" type="url" inputmode="url" autocomplete="url" aria-describedby="url-help" placeholder="https://" required>
+        <button type="submit" id="url-btn">Check page</button>
+      </div>
+    </form>
+
+    <p class="divider"><span>or</span></p>
+
+    <form id="check-form" class="panel">
       <label for="html-input">HTML to check</label>
-      <p id="html-help" class="help">Paste a full page or a snippet. Nothing is uploaded; everything runs in your browser.</p>
-      <textarea id="html-input" rows="14" aria-describedby="html-help" spellcheck="false" required></textarea>
+      <p id="html-help" class="help">Paste a full page or a snippet. Tip: on any page press Ctrl+U (Cmd+Option+U on Mac) to view its source.</p>
+      <textarea id="html-input" rows="12" aria-describedby="html-help" spellcheck="false" required></textarea>
 
       <div class="actions">
-        <button type="submit">Check accessibility</button>
+        <button type="submit">Check HTML</button>
         <button type="button" id="sample-btn" class="secondary">Load sample</button>
         <button type="button" id="clear-btn" class="secondary">Clear</button>
       </div>
     </form>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <p id="error" class="error-msg" role="alert" hidden></p>
 
     <section id="results" aria-labelledby="results-heading" hidden>
       <h2 id="results-heading" tabindex="-1">Results</h2>

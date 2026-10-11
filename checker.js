@@ -77,6 +77,102 @@ function findInlineBackground(el) {
   return [255, 255, 255];
 }
 
+/* ---------- Contrast on a rendered page (uses real CSS) ---------- */
+
+const MAX_CONTRAST_ISSUES = 40;
+
+function parseRgba(value) {
+  const m = value && value.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?/);
+  if (!m) return null;
+  let a = m[4] === undefined ? 1 : parseFloat(m[4]);
+  if (m[4] && m[4].endsWith('%')) a /= 100;
+  return { rgb: [m[1], m[2], m[3]].map(Number), a };
+}
+
+function blend(top, bottom) {
+  return top.rgb.map((c, i) => c * top.a + bottom[i] * (1 - top.a));
+}
+
+// Returns the solid background color behind an element, or null when a
+// background image or gradient makes it impossible to know.
+function renderedBackground(el, win) {
+  const layers = [];
+  let node = el;
+  while (node && node.nodeType === 1) {
+    const cs = win.getComputedStyle(node);
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+    const bg = parseRgba(cs.backgroundColor);
+    if (bg && bg.a > 0) {
+      layers.push(bg);
+      if (bg.a >= 1) break;
+    }
+    node = node.parentElement;
+  }
+  let color = [255, 255, 255];
+  for (let i = layers.length - 1; i >= 0; i--) color = blend(layers[i], color);
+  return color;
+}
+
+function hasOwnText(el) {
+  return [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 0);
+}
+
+function isVisible(el, win) {
+  let node = el;
+  while (node && node.nodeType === 1) {
+    const cs = win.getComputedStyle(node);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
+    node = node.parentElement;
+  }
+  // Screen-reader-only text (clipped to 1px) is not visible on screen.
+  const rect = el.getBoundingClientRect();
+  return !(rect.width <= 1 && rect.height <= 1);
+}
+
+function renderedContrastIssues(rdoc) {
+  const win = rdoc.defaultView;
+  const issues = [];
+  let skipped = 0;
+  const seen = new Set();
+
+  for (const el of rdoc.body ? rdoc.body.querySelectorAll('*') : []) {
+    if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG'].includes(el.tagName.toUpperCase())) continue;
+    if (!hasOwnText(el) || !isVisible(el, win)) continue;
+
+    const cs = win.getComputedStyle(el);
+    const fg = parseRgba(cs.color);
+    if (!fg) continue;
+    const bg = renderedBackground(el, win);
+    if (!bg) continue; // text on an image: needs a manual check
+
+    const fgSolid = fg.a < 1 ? blend(fg, bg) : fg.rgb;
+    const ratio = contrastRatio(fgSolid, bg);
+    const size = parseFloat(cs.fontSize) || 16;
+    const bold = parseInt(cs.fontWeight, 10) >= 700;
+    const large = size >= 24 || (bold && size >= 18.66);
+    const needed = large ? 3 : 4.5;
+    if (ratio >= needed) continue;
+
+    // Group repeats of the same color pair so one CSS rule doesn't flood the report.
+    const key = fgSolid.map(Math.round).join() + '|' + bg.map(Math.round).join() + '|' + needed;
+    if (seen.has(key)) { skipped++; continue; }
+    seen.add(key);
+
+    if (issues.length >= MAX_CONTRAST_ISSUES) { skipped++; continue; }
+    const toHex = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+    issues.push({
+      severity: 'error',
+      element: el,
+      note: `Contrast is ${ratio.toFixed(2)}:1, needs ${needed}:1. Text ${toHex(fgSolid)} on ${toHex(bg)}, ${Math.round(size)}px.`
+    });
+  }
+
+  if (skipped && issues.length) {
+    issues[issues.length - 1].note += ` (${skipped} more elements use the same or similar low-contrast colors.)`;
+  }
+  return issues;
+}
+
 /* ---------- Rules ---------- */
 
 const RULES = [
@@ -299,7 +395,10 @@ const RULES = [
     title: 'Text color contrast is too low',
     wcag: '1.4.3 Contrast (Minimum) (AA)',
     fix: 'Use at least 4.5:1 for normal text, or 3:1 for large text (24px, or 18.66px bold).',
-    run(doc) {
+    run(doc, isFullPage, ctx) {
+      if (ctx && ctx.renderedDoc) return renderedContrastIssues(ctx.renderedDoc);
+
+      // Fallback: page could not be rendered, so check inline styles only.
       const issues = [];
       doc.querySelectorAll('[style*="color"]').forEach(el => {
         const fg = parseColor(inlineStyle(el, 'color'));
@@ -319,13 +418,29 @@ const RULES = [
   }
 ];
 
-function runChecks(html) {
+/** True when the text contains at least one HTML tag. */
+function looksLikeHtml(text) {
+  return /<\s*[a-z!][^>]*>/i.test(text);
+}
+
+/** True when the text is just a web address. */
+function looksLikeUrl(text) {
+  return /^(https?:\/\/|www\.)\S+$/i.test(text.trim());
+}
+
+/**
+ * Runs every rule.
+ * options.renderedDoc: the same page rendered in an iframe, so styles
+ * from stylesheets can be measured for the contrast check.
+ */
+function runChecks(html, options = {}) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const isFullPage = /<html[\s>]/i.test(html);
   const issues = [];
+  const ctx = { renderedDoc: options.renderedDoc || null };
 
   RULES.forEach(rule => {
-    rule.run(doc, isFullPage).forEach(found => {
+    rule.run(doc, isFullPage, ctx).forEach(found => {
       issues.push({
         id: rule.id,
         title: rule.title,
@@ -341,4 +456,4 @@ function runChecks(html) {
   return { issues, rulesRun: RULES.length };
 }
 
-if (typeof module !== 'undefined') module.exports = { runChecks, contrastRatio, parseColor };
+if (typeof module !== 'undefined') module.exports = { runChecks, contrastRatio, parseColor, looksLikeHtml, looksLikeUrl };

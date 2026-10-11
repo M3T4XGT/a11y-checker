@@ -140,6 +140,53 @@ button.secondary, .filter {
 
 .pass { color: var(--pass); font-weight: 600; }
 
+.url-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.url-row input {
+  flex: 1 1 260px;
+  font: inherit;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--muted);
+  margin: 1.5rem 0;
+}
+.divider::before, .divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.status { color: var(--muted); min-height: 1.5em; }
+
+.error-msg {
+  background: var(--error-bg);
+  color: var(--error);
+  border-left: 6px solid var(--error);
+  padding: .75rem 1rem;
+  border-radius: 4px;
+}
+
+.checked-url { color: var(--muted); word-break: break-all; }
+
+button[disabled] { opacity: .6; cursor: wait; }
+
+#render-frame {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1280px;
+  height: 900px;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }

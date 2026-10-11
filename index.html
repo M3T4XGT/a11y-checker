@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accessibility Checker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <h1>Accessibility Checker</h1>
+    <p>Paste HTML and check it against common WCAG 2.1 AA problems.</p>
+  </header>
+
+  <main id="main">
+    <form id="check-form">
+      <label for="html-input">HTML to check</label>
+      <p id="html-help" class="help">Paste a full page or a snippet. Nothing is uploaded; everything runs in your browser.</p>
+      <textarea id="html-input" rows="14" aria-describedby="html-help" spellcheck="false" required></textarea>
+
+      <div class="actions">
+        <button type="submit">Check accessibility</button>
+        <button type="button" id="sample-btn" class="secondary">Load sample</button>
+        <button type="button" id="clear-btn" class="secondary">Clear</button>
+      </div>
+    </form>
+
+    <section id="results" aria-labelledby="results-heading" hidden>
+      <h2 id="results-heading" tabindex="-1">Results</h2>
+      <p id="summary" role="status"></p>
+      <div class="filters" role="group" aria-label="Filter by severity">
+        <button type="button" class="filter" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="filter" data-filter="error" aria-pressed="false">Errors</button>
+        <button type="button" class="filter" data-filter="warning" aria-pressed="false">Warnings</button>
+      </div>
+      <ul id="issue-list"></ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Automated checks catch only part of accessibility issues. Always test with a keyboard and a screen reader too.</p>
+  </footer>
+
+  <script src="checker.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
